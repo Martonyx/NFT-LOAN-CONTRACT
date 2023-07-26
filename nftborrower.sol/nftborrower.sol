@@ -141,7 +141,7 @@ contract NFTLoanContract {
         require(block.timestamp <= loan.approvedAt + loan.loanDuration, "Loan duration exceeded");
         require(msg.sender == loan.borrower, "Not Borrower");
         uint256 timeElapsed = block.timestamp - loan.approvedAt;
-        uint256 interest_ = (10 * timeElapsed) / (loanDurationInDays); // 5% monthly
+        uint256 interest_ = (loan.interestRate * timeElapsed) / (loanDurationInDays); // 5% monthly
         uint256 amount = interest_;
 
         require(msg.value >= amount, "Incorrect loan amount");
@@ -181,7 +181,7 @@ contract NFTLoanContract {
         require(block.timestamp <= loan.approvedAt + (loan.loanDuration * 1 days), "Loan duration exceeded");
         require(msg.sender == loan.borrower, "Not Borrower");
         uint256 timeElapsed = block.timestamp - loan.approvedAt;
-        uint256 interest_ = (10 * timeElapsed) / (loanDurationInDays); // 5% monthly
+        uint256 interest_ = (loan.interestRate * timeElapsed) / (loanDurationInDays); // 5% monthly
         return interest_;
     }
 }
