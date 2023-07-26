@@ -55,7 +55,7 @@ contract NFTLoanContract {
         uint256 _collateral
     ) public onlyOwner {
         require(loanCounter < MAX_LOAN_LIMIT, "Loan limit reached");
-        loanCounter++;
+        
         loans[loanCounter] = Loan(
             _loanTitle,
             _NFTDetails,
@@ -70,7 +70,10 @@ contract NFTLoanContract {
             0,
             LoanStatus.isOpen
         );
-        require(loans[loanCounter].nft.ownerOf(_nftId) == msg.sender, "Only owned NFTs can be loaned");
+
+        loanCounter++;
+
+        require(loans[loanCounter - 1].nft.ownerOf(_nftId) == msg.sender, "Only owned NFTs can be loaned");
     }
 
     function requestLoan(uint256 _loanId, uint256 _loanAmount) public payable loanExists(_loanId) {
@@ -84,6 +87,7 @@ contract NFTLoanContract {
 
          // Check if the loan request is within the inReview duration
         if (block.timestamp >= loan.requestedAt + (inReview * 1 days)) {
+            require(loan.status == LoanStatus.inReview, "not applied");
             // If the loan request is not approved within the loan duration,
             // transfer the collateral back to the borrower
             (bool success, ) = payable(loan.borrower).call{value: loan.collateral}("");
@@ -111,15 +115,24 @@ contract NFTLoanContract {
         loan.nft.transferFrom(owner, loan.borrower, loan.nftId);
         loan.approvedAt = block.timestamp;
         loan.status = LoanStatus.isApproved;
+
+        if (block.timestamp >= loan.approvedAt + loanDurationInDays) {
+            require(loan.status == LoanStatus.isApproved, "not applied");
+            // If the loan request is not approved within the loan duration,
+            // transfer the collateral back to the lender
+            (bool success, ) = payable(owner).call{value: loan.collateral}("");
+            require(success, "Transfer failed");
+            loan.status = LoanStatus.isOpen;
+        }
     }
 
     function closeLoan(uint256 _loanId) public onlyOwner loanExists(_loanId) {
         Loan storage loan = loans[_loanId];
         require(loan.status == LoanStatus.isPaid, "Not Paid");
-        loan.nft.transferFrom(owner, owner, loan.nftId);
+        
 
         // Transfer the loan amount to the contract owner
-        (bool success, ) = payable(owner).call{value: loan.loanAmount}("");
+        (bool success, ) = payable(owner).call{value: address(this).balance}("");
         require(success, "Transfer failed");
         loan.status = LoanStatus.isClosed;
     }
@@ -130,10 +143,13 @@ contract NFTLoanContract {
         require(block.timestamp <= loan.approvedAt + (loan.loanDuration * 1 days), "Loan duration exceeded");
         require(msg.sender == loan.borrower, "Not Borrower");
         uint256 timeElapsed = block.timestamp - loan.approvedAt;
-        uint256 interestRate_ = (loan.loanAmount * 5 * timeElapsed) / (loanDurationInDays); // 5% monthly
-        uint256 amount = interestRate_;
-        require(msg.value >= amount, "Incorrect loan amount");
+        uint256 interest_ = (loan.loanAmount * 5 * timeElapsed) / (loanDurationInDays); // 5% monthly
+        uint256 amount = interest_;
 
+        require(msg.value >= amount, "Incorrect loan amount");
+        loan.nft.transferFrom(loan.borrower, owner, loan.nftId);
+        (bool success, ) = payable(loan.borrower).call{value: loan.loanAmount}("");
+        require(success, "Transfer failed");
         loan.status = LoanStatus.isPaid;
         loan.loanAmount = amount;
     }
@@ -159,5 +175,15 @@ contract NFTLoanContract {
 
     function getLoanDetails(uint256 _loanId) public view returns (Loan memory) {
         return loans[_loanId];
+    }
+
+    function getInterest(uint256 _loanId) public view returns(uint256) {
+        Loan storage loan = loans[_loanId];
+        require(loan.status == LoanStatus.isApproved, "Not Approved");
+        require(block.timestamp <= loan.approvedAt + (loan.loanDuration * 1 days), "Loan duration exceeded");
+        require(msg.sender == loan.borrower, "Not Borrower");
+        uint256 timeElapsed = block.timestamp - loan.approvedAt;
+        uint256 interest_ = (loan.loanAmount * 5 * timeElapsed) / (loanDurationInDays); // 5% monthly
+        return interest_;
     }
 }
