@@ -76,11 +76,11 @@ contract NFTLoanContract {
         require(loans[loanCounter - 1].nft.ownerOf(_nftId) == msg.sender, "Only owned NFTs can be loaned");
     }
 
-    function requestLoan(uint256 _loanId, uint256 _loanAmount) public payable loanExists(_loanId) {
+    function requestLoan(uint256 _loanId) public payable loanExists(_loanId) {
         Loan storage loan = loans[_loanId];
-        require(msg.value >= loan.collateral, "Provide more collateral");
+        require(msg.value >= loan.collateral * 1 ether, "Provide more collateral");
         require(loan.borrower == owner && loan.borrower != msg.sender, "Loan already approved or not available");
-        loan.loanAmount = _loanAmount;
+        loan.loanAmount = loan.collateral * 1 ether;
         loan.borrower = payable(msg.sender);
         loan.status = LoanStatus.inReview;
         loan.requestedAt = block.timestamp;
@@ -89,9 +89,13 @@ contract NFTLoanContract {
         if (block.timestamp >= loan.requestedAt + inReview && loan.status == LoanStatus.inReview) {
             // If the loan request is not approved within the loan duration,
             // transfer the collateral back to the borrower
-            (bool success, ) = payable(loan.borrower).call{value: loan.collateral}("");
+
+            (bool success, ) = payable(loan.borrower).call{value: loan.loanAmount}("");
             require(success, "Transfer failed");
+            loan.borrower = owner;
             loan.status = LoanStatus.isOpen;
+            loan.loanAmount = 0;
+            loan.requestedAt = 0;
         }
     }
 
@@ -101,28 +105,33 @@ contract NFTLoanContract {
         require(msg.sender == loan.borrower, "Only the borrower can reclaim collateral");
 
         // Transfer the collateral amount back to the borrower
-
-        (bool success, ) = payable(loan.borrower).call{value: loan.collateral}("");
+        (bool success, ) = payable(loan.borrower).call{value: loan.collateral * 1 ether}("");
         require(success, "Transfer failed");
         loan.status = LoanStatus.isOpen;
+        loan.borrower = owner;
+        loan.loanAmount = 0;
+        loan.requestedAt = 0;
     }
 
     function approveLoan(uint256 _loanId) public onlyOwner loanExists(_loanId) {
         Loan storage loan = loans[_loanId];
-        require(loans[_loanId].status == LoanStatus.inReview, "Loan is not under review");
-        require(loan.loanAmount >= loan.collateral, "Collateral not met");
+        require(loan.status == LoanStatus.inReview, "Loan is not under review");
+        require(loan.loanAmount <= loan.collateral, "Collateral not met");
+
         loan.nft.transferFrom(owner, loan.borrower, loan.nftId);
+
         loan.approvedAt = block.timestamp;
         loan.status = LoanStatus.isApproved;
 
         if (block.timestamp >= loan.approvedAt + loanDurationInDays && loan.status == LoanStatus.isApproved) {
-            // If the loan request is not approved within the loan duration,
+            // If the loan is not repaid within the loan duration,
             // transfer the collateral back to the lender
-            (bool success, ) = payable(owner).call{value: loan.collateral}("");
-            require(success, "Transfer failed");
+            (bool refundSuccess, ) = payable(owner).call{value: loan.collateral * 1 ether}("");
+            require(refundSuccess, "Collateral refund failed");
             loan.status = LoanStatus.isOpen;
         }
     }
+
 
     function closeLoan(uint256 _loanId) public onlyOwner loanExists(_loanId) {
         Loan storage loan = loans[_loanId];
@@ -130,7 +139,7 @@ contract NFTLoanContract {
         
 
         // Transfer the loan amount to the contract owner
-        (bool success, ) = payable(owner).call{value: address(this).balance}("");
+        (bool success, ) = payable(owner).call{value: loan.loanAmount}("");
         require(success, "Transfer failed");
         loan.status = LoanStatus.isClosed;
     }
@@ -142,14 +151,14 @@ contract NFTLoanContract {
         require(msg.sender == loan.borrower, "Not Borrower");
         uint256 timeElapsed = block.timestamp - loan.approvedAt;
         uint256 interest_ = (loan.interestRate * timeElapsed) / (loanDurationInDays); // 5% monthly
-        uint256 amount = interest_;
+        uint256 amount = interest_ * 1 ether;
 
         require(msg.value >= amount, "Incorrect loan amount");
         loan.nft.transferFrom(loan.borrower, owner, loan.nftId);
-        (bool success, ) = payable(loan.borrower).call{value: loan.collateral}("");
+        (bool success, ) = payable(loan.borrower).call{value: loan.collateral * 1 ether}("");
         require(success, "Transfer failed");
-        loan.status = LoanStatus.isPaid;
         loan.loanAmount = amount;
+        loan.status = LoanStatus.isPaid;
     }
 
     function getOngoingLoans() public view returns (Loan[] memory) {
@@ -182,6 +191,6 @@ contract NFTLoanContract {
         require(msg.sender == loan.borrower, "Not Borrower");
         uint256 timeElapsed = block.timestamp - loan.approvedAt;
         uint256 interest_ = (loan.interestRate * timeElapsed) / (loanDurationInDays); // 5% monthly
-        return interest_;
+        return interest_ * 1 ether;
     }
 }
