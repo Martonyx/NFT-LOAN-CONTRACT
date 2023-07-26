@@ -148,7 +148,7 @@ contract NFTLoanContract {
 
         require(msg.value >= amount, "Incorrect loan amount");
         loan.nft.transferFrom(loan.borrower, owner, loan.nftId);
-        (bool success, ) = payable(loan.borrower).call{value: loan.loanAmount}("");
+        (bool success, ) = payable(loan.borrower).call{value: loan.collateral}("");
         require(success, "Transfer failed");
         loan.status = LoanStatus.isPaid;
         loan.loanAmount = amount;
