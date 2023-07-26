@@ -9,7 +9,7 @@ interface IERC721 {
 contract NFTLoanContract {
     address payable public owner;
     uint256 public loanDurationInDays = 30 days;
-    uint256 public inReview = 7;
+    uint256 public inReview = 7 days;
 
     enum LoanStatus { isOpen, inReview, isApproved, isPaid, isClosed }
 
@@ -86,8 +86,7 @@ contract NFTLoanContract {
         loan.requestedAt = block.timestamp;
 
          // Check if the loan request is within the inReview duration
-        if (block.timestamp >= loan.requestedAt + (inReview * 1 days)) {
-            require(loan.status == LoanStatus.inReview, "not applied");
+        if (block.timestamp >= loan.requestedAt + inReview && loan.status == LoanStatus.inReview) {
             // If the loan request is not approved within the loan duration,
             // transfer the collateral back to the borrower
             (bool success, ) = payable(loan.borrower).call{value: loan.collateral}("");
@@ -116,8 +115,7 @@ contract NFTLoanContract {
         loan.approvedAt = block.timestamp;
         loan.status = LoanStatus.isApproved;
 
-        if (block.timestamp >= loan.approvedAt + loanDurationInDays) {
-            require(loan.status == LoanStatus.isApproved, "not applied");
+        if (block.timestamp >= loan.approvedAt + loanDurationInDays && loan.status == LoanStatus.isApproved) {
             // If the loan request is not approved within the loan duration,
             // transfer the collateral back to the lender
             (bool success, ) = payable(owner).call{value: loan.collateral}("");
@@ -140,10 +138,10 @@ contract NFTLoanContract {
     function repayLoan(uint256 _loanId) public payable loanExists(_loanId) {
         Loan storage loan = loans[_loanId];
         require(loan.status == LoanStatus.isApproved, "Not Approved");
-        require(block.timestamp <= loan.approvedAt + (loan.loanDuration * 1 days), "Loan duration exceeded");
+        require(block.timestamp <= loan.approvedAt + loan.loanDuration, "Loan duration exceeded");
         require(msg.sender == loan.borrower, "Not Borrower");
         uint256 timeElapsed = block.timestamp - loan.approvedAt;
-        uint256 interest_ = (loan.loanAmount * 5 * timeElapsed) / (loanDurationInDays); // 5% monthly
+        uint256 interest_ = (10 * timeElapsed) / (loanDurationInDays); // 5% monthly
         uint256 amount = interest_;
 
         require(msg.value >= amount, "Incorrect loan amount");
@@ -156,7 +154,7 @@ contract NFTLoanContract {
 
     function getOngoingLoans() public view returns (Loan[] memory) {
         uint256 countOngoingLoans = 0;
-        for (uint256 i = 1; i <= loanCounter; i++) {
+        for (uint256 i = 0; i < loanCounter; i++) {
             if (loans[i].status == LoanStatus.isOpen) {
                 countOngoingLoans++;
             }
@@ -164,7 +162,7 @@ contract NFTLoanContract {
 
         Loan[] memory ongoingLoans = new Loan[](countOngoingLoans);
         uint256 currentIndex = 0;
-        for (uint256 i = 1; i <= loanCounter; i++) {
+        for (uint256 i = 0; i < loanCounter; i++) {
             if (loans[i].status == LoanStatus.isOpen) {
                 ongoingLoans[currentIndex] = loans[i];
                 currentIndex++;
@@ -183,7 +181,7 @@ contract NFTLoanContract {
         require(block.timestamp <= loan.approvedAt + (loan.loanDuration * 1 days), "Loan duration exceeded");
         require(msg.sender == loan.borrower, "Not Borrower");
         uint256 timeElapsed = block.timestamp - loan.approvedAt;
-        uint256 interest_ = (loan.loanAmount * 5 * timeElapsed) / (loanDurationInDays); // 5% monthly
+        uint256 interest_ = (10 * timeElapsed) / (loanDurationInDays); // 5% monthly
         return interest_;
     }
 }
