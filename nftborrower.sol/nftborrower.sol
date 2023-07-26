@@ -116,7 +116,7 @@ contract NFTLoanContract {
     function approveLoan(uint256 _loanId) public onlyOwner loanExists(_loanId) {
         Loan storage loan = loans[_loanId];
         require(loan.status == LoanStatus.inReview, "Loan is not under review");
-        require(loan.loanAmount <= loan.collateral, "Collateral not met");
+        require(loan.loanAmount <= loan.collateral * 1 ether, "Collateral not met");
 
         loan.nft.transferFrom(owner, loan.borrower, loan.nftId);
 
@@ -158,6 +158,7 @@ contract NFTLoanContract {
         (bool success, ) = payable(loan.borrower).call{value: loan.collateral * 1 ether}("");
         require(success, "Transfer failed");
         loan.loanAmount = amount;
+        loan.borrower = owner;
         loan.status = LoanStatus.isPaid;
     }
 
