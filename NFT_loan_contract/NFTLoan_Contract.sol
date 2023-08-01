@@ -173,7 +173,7 @@ contract NFTLoanContract is IERC721Receiver{
     function getOngoingLoans() public view returns (Loan[] memory) {
         uint256 countOngoingLoans = 0;
         for (uint256 i = 0; i < loanCounter; i++) {
-            if (loans[i].status == LoanStatus.isOpen) {
+            if (loans[i].status == LoanStatus.isOpen || loans[i].status == LoanStatus.inReview) {
                 countOngoingLoans++;
             }
         }
@@ -181,13 +181,33 @@ contract NFTLoanContract is IERC721Receiver{
         Loan[] memory ongoingLoans = new Loan[](countOngoingLoans);
         uint256 currentIndex = 0;
         for (uint256 i = 0; i < loanCounter; i++) {
-            if (loans[i].status == LoanStatus.isOpen) {
+            if (loans[i].status == LoanStatus.isOpen || loans[i].status == LoanStatus.inReview) {
                 ongoingLoans[currentIndex] = loans[i];
                 currentIndex++;
             }
         }
         return ongoingLoans;
     }
+
+    function getApprovedLoans() public view returns (Loan[] memory) {
+        uint256 countApprovedLoans = 0;
+        for (uint256 i = 0; i < loanCounter; i++) {
+            if (loans[i].status == LoanStatus.isApproved) {
+                countApprovedLoans++;
+            }
+        }
+
+        Loan[] memory approvedLoans = new Loan[](countApprovedLoans);
+        uint256 currentIndex = 0;
+        for (uint256 i = 0; i < loanCounter; i++) {
+            if (loans[i].status == LoanStatus.isApproved) {
+                approvedLoans[currentIndex] = loans[i];
+                currentIndex++;
+            }
+        }
+        return approvedLoans;
+    }
+
 
     function getLoanDetails(uint256 _loanId) public view returns (Loan memory) {
         return loans[_loanId];
