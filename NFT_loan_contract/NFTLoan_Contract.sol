@@ -158,9 +158,10 @@ contract NFTLoanContract is IERC721Receiver{
         require(msg.sender == loan.borrower, "Not Borrower");
         uint256 timeElapsed = block.timestamp - loan.approvedAt;
         uint256 interest_ = (loan.interestRate * timeElapsed) / (loanDurationInDays); // 5% monthly
-        uint256 amount = interest_ * 1 ether;
+        uint256 InterestAmount = interest_ * 1 ether;
+        uint256 amount = loan.loanAmount + InterestAmount;
         uint256 _nftId = loan.nftId;
-        require(msg.value >= loan.loanAmount + amount, "Incorrect loan amount");
+        require(msg.value >= amount, "Incorrect loan amount");
         loan.nft.safeTransferFrom(address(this), loan.borrower, _nftId);
  
         loan.loanAmount = amount;
