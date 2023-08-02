@@ -170,7 +170,7 @@ contract NFTLoanContract is IERC721Receiver{
         loan.status = LoanStatus.isPaid;
     }
 
-    function getOngoingLoans() public view returns (Loan[] memory) {
+    function getLoanIdsOfOngoingLoans() public view returns (uint256[] memory) {
         uint256 countOngoingLoans = 0;
         for (uint256 i = 0; i < loanCounter; i++) {
             if (loans[i].status == LoanStatus.isOpen || loans[i].status == LoanStatus.inReview) {
@@ -178,18 +178,18 @@ contract NFTLoanContract is IERC721Receiver{
             }
         }
 
-        Loan[] memory ongoingLoans = new Loan[](countOngoingLoans);
+        uint256[] memory ongoingLoanIds = new uint256[](countOngoingLoans);
         uint256 currentIndex = 0;
         for (uint256 i = 0; i < loanCounter; i++) {
             if (loans[i].status == LoanStatus.isOpen || loans[i].status == LoanStatus.inReview) {
-                ongoingLoans[currentIndex] = loans[i];
+                ongoingLoanIds[currentIndex] = i; 
                 currentIndex++;
             }
         }
-        return ongoingLoans;
+        return ongoingLoanIds;
     }
 
-    function getApprovedLoans() public view returns (Loan[] memory) {
+    function getLoanIdsOfApprovedLoans() public view returns (uint256[] memory) {
         uint256 countApprovedLoans = 0;
         for (uint256 i = 0; i < loanCounter; i++) {
             if (loans[i].status == LoanStatus.isApproved) {
@@ -197,20 +197,15 @@ contract NFTLoanContract is IERC721Receiver{
             }
         }
 
-        Loan[] memory approvedLoans = new Loan[](countApprovedLoans);
+        uint256[] memory approvedLoanIds = new uint256[](countApprovedLoans);
         uint256 currentIndex = 0;
         for (uint256 i = 0; i < loanCounter; i++) {
             if (loans[i].status == LoanStatus.isApproved) {
-                approvedLoans[currentIndex] = loans[i];
+                approvedLoanIds[currentIndex] = i; 
                 currentIndex++;
             }
         }
-        return approvedLoans;
-    }
-
-
-    function getLoanDetails(uint256 _loanId) public view returns (Loan memory) {
-        return loans[_loanId];
+        return approvedLoanIds;
     }
 
     function getInterest(uint256 _loanId) public view returns(uint256) {
