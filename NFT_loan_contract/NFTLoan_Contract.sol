@@ -11,7 +11,6 @@ interface IERC721 {
 contract NFTLoanContract is IERC721Receiver{
     address payable public owner;
     uint256 public loanDurationInDays = 30 days;
-    uint256 public inReview = 7 days;
 
     enum LoanStatus { isOpen, inReview, isApproved, isPaid, isClosed }
 
@@ -86,19 +85,6 @@ contract NFTLoanContract is IERC721Receiver{
         loan.nftId = _nftId;
         loan.requestedAt = block.timestamp;
         loan.nft.safeTransferFrom(msg.sender, address(this), _nftId);
-
-         // Check if the loan request is within the inReview duration
-        if (block.timestamp >= loan.requestedAt + inReview && loan.status == LoanStatus.inReview) {
-            // If the loan request is not approved within the loan duration,
-            // transfer the collateral back to the borrower
-
-            loan.nft.safeTransferFrom(address(this), loan.borrower, loan.nftId);
-            loan.borrower = owner;
-            loan.status = LoanStatus.isOpen;
-            loan.loanAmount = 0;
-            loan.nftId = 0;
-            loan.requestedAt = 0;
-        }
     }
 
     function onERC721Received(address /* operator */, address /* from */, uint256 /* tokenId */, bytes calldata /* data */) external pure override returns (bytes4) {
@@ -131,24 +117,22 @@ contract NFTLoanContract is IERC721Receiver{
         loan.approvedAt = block.timestamp;
         loan.status = LoanStatus.isApproved;
 
-        if (block.timestamp >= loan.approvedAt + loanDurationInDays && loan.status == LoanStatus.isApproved) {
-            // If the loan is not repaid within the loan duration,
-            // transfer the collateral back to the lender
-            uint256 _nftId = loan.nftId;
-            loan.nft.safeTransferFrom(address(this), owner, _nftId);
-            loan.status = LoanStatus.isOpen;
-        }
     }
 
     function closeLoan(uint256 _loanId) public onlyOwner loanExists(_loanId) {
         Loan storage loan = loans[_loanId];
-        require(loan.status == LoanStatus.isPaid, "Not Paid");
-        
+        require(loan.status == LoanStatus.isPaid || block.timestamp >= loan.approvedAt + loanDurationInDays, "Not Paid");
 
+        if (loan.status != LoanStatus.isPaid) {
+            uint256 _nftId = loan.nftId;
+            loan.nft.safeTransferFrom(address(this), owner, _nftId);
+            loan.status = LoanStatus.isOpen;
+        } else {
         // Transfer the loan amount to the contract owner
         (bool success, ) = payable(owner).call{value: loan.loanAmount}("");
         require(success, "Transfer failed");
         loan.status = LoanStatus.isClosed;
+        }
     }
 
     function repayLoan(uint256 _loanId) public payable loanExists(_loanId) {
